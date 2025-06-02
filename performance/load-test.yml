@@ -1,0 +1,70 @@
+config:
+  target: "http://localhost:4000"
+  processor: "./functions.js"  # Arquivo externo com funções JS
+  phases:
+    - duration: 30
+      arrivalRate: 2
+      rampTo: 10
+      name: "Rampa de carga crescente"
+    - duration: 60
+      arrivalRate: 10
+      name: "Carga Sustentada"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+    timeout: 10000
+    response:
+      - statusCode: [200, 201, 400, 401, 404]
+      - contentType: json
+
+scenarios:
+  - name: "Fluxo de Autenticação"
+    flow:
+      - function: "generateEmail"
+
+      - post:
+          url: "/auth/register"
+          json:
+            nome: "Test User"
+            email: "{{ generatedEmail }}"
+            password: "password123"
+            confirmpassword: "password123"
+          expect:
+            - statusCode: [201, 400]
+            - contentType: json
+
+      - post:
+          url: "/auth/login"
+          json:
+            email: "{{ generatedEmail }}"
+            password: "password123"
+          expect:
+            - statusCode: [200, 401, 422, 404]
+            - contentType: json
+          capture:
+            - json: "$.token"
+              as: "authToken"
+            - json: "$.user.id"
+              as: "userId"
+
+  - name: "Teste de carga na Rota Principal"
+    flow:
+      - get:
+          url: "/"
+          expect:
+            - statusCode: 200
+            - contentType: json
+            - hasProperty: "msg"
+
+  - name: "Teste de Validação"
+    flow:
+      - post:
+          url: "/auth/register"
+          json:
+            nome: "T"
+            email: "test{{ $randomNumber(1, 1000) }}@teste.com"
+            password: "password123"
+            confirmpassword: "password123"
+          expect:
+            - statusCode: [400, 201]
+            - contentType: json

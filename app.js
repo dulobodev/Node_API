@@ -1,149 +1,79 @@
+// app.js
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
-const User = require("./usuarioModel");
-const jwt = require("jsonwebtoken");
+const authRoutes = require("./routes/auth_routes");
+const userRoutes = require("./routes/user_routes");
+const errorHandler = require("./middlewares/error_middleware");
 
-//cria uma instância do Express
 const app = express();
+let server = null; // Referência para o servidor
 
-//Configura o express para entender req. em Json
+// Middlewares
 app.use(express.json());
 
-app.get("/", (requisicao, resposta) => {
-  resposta.status(200).send({ msg: "Bem Vindo a API!" });
+// Rotas públicas
+app.get("/", (req, res) => {
+  res.status(200).json({ msg: "Bem-vindo à API!" });
 });
 
-app.post("/auth/register", async (req, res) => {
-  const { name, email, password, confirmpassword } = req.body;
+// Rotas de usuário
+app.use("/user", userRoutes);
 
-  if (!name) {
-    return res.status(422).json({ msg: "O nome é obrigatório! " });
-  }
+// Rotas de autenticação
+app.use("/auth", authRoutes);
 
-  if (!email) {
-    return res.status(422).json({ msg: "O email é obrigatório! " });
-  }
+// Middleware de erro
+app.use(errorHandler);
 
-  if (!password) {
-    return res.status(422).json({ msg: "A senha é obrigatória! " });
-  }
+const port = process.env.PORT || 4000;
 
-  if (password != confirmpassword) {
-    return res
-      .status(422)
-      .json({ msg: "A senha e a confirmação precisam ser iguais!" });
-  }
-
-  const userExists = await User.findOne({ email: email });
-
-  if (userExists) {
-    return res.status(422).json({ msg: "Por favor, utilize outro E-mail!" });
-  }
-
-  const salt = await bcrypt.genSalt(12);
-  const passwordHash = await bcrypt.hash(password, salt);
-
-  const user = new User({
-    name,
-    email,
-    password: passwordHash,
-  });
-
+const startServer = async (portToUse = port) => {
   try {
-    await user.save(); // Salva o usuario no banco de Dados
-
-    res.status(201).json({ msg: "Usuário criado com sucesso!" });
-  } catch (error) {
-    res.status(500).json({ msg: error });
-  }
-});
-
-app.post("/auth/login", async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email) {
-    return res.status(422).json({ msg: "O E-mail é obrigatorio" });
-  }
-
-  if (!password) {
-    return res.status(422).json({ msg: "A senha é obrigatoria" });
-  }
-
-  const user = await User.findOne({ email: email });
-
-  if (!user) {
-    return res.status(404).json({ msg: "Usuario não encontrado!" });
-  }
-
-  const checkPassword = await bcrypt.compare(password, user.password);
-
-  if (!checkPassword) {
-    return res.status(422).json({ msg: "Senha invalida" });
-  }
-
-  try {
-    const secret = process.env.SECRET;
-
-    const token = jwt.sign(
-      {
-        id: user._id,
-      },
-      secret
-    );
-    res
-      .status(200)
-      .json({ msg: "Autentificação realizada com sucesso.", token });
-  } catch (err) {
-    res.status(500).json({ msg: err });
-  }
-});
-
-app.get("/user/:id", checktoken, async (req, res) => {
-  const id = req.params.id;
-
-  try {
-    const user = await User.findById(id, "-password");
-    if (!user) {
-      return res.status(404).json({ msg: "Usuário não encontrado" });
+    if (process.env.NODE_ENV !== 'test') {
+      const dbUser = process.env.DB_USER;
+      const dbPassword = process.env.DB_PASS;
+      
+      await mongoose.connect(
+        `mongodb+srv://${dbUser}:${dbPassword}@clusterapi.aeczj.mongodb.net/?retryWrites=true&w=majority&appName=ClusterAPI`,
+        {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+          serverSelectionTimeoutMS: 30000
+        }
+      );
+      console.log("Conectado ao MongoDB Atlas com sucesso!");
     }
 
-    res.status(200).json(user);
-  } catch (error) {
-    res.status(500).json({ msg: "Erro ao buscar usuário" });
-    x;
-  }
-});
-
-//Midlleeware (Chegagem de token)
-function checktoken(req, res, next) {
-  const authheader = req.headers["authorization"];
-  const token = authheader && authheader.split(" ")[1]; // Bearer <token>
-
-  if (!token) return res.status(401).json({ msg: "Acesso Negado!" });
-
-  try {
-    const secret = process.env.SECRET;
-
-    jwt.verify(token, secret);
-
-    next();
+    return new Promise((resolve) => {
+      server = app.listen(portToUse, () => {
+        console.log(`Servidor rodando na porta ${portToUse}`);
+        resolve(server);
+      });
+    });
   } catch (err) {
-    res.status(400).json({ msg: "Token inválido." });
+    console.error("Erro ao conectar no MongoDB", err);
+    process.exit(1);
   }
+};
+
+const closeServer = () => {
+  return new Promise((resolve) => {
+    if (server) {
+      server.close(() => resolve());
+    } else {
+      resolve();
+    }
+  });
+};
+
+// Inicia o servidor apenas fora do ambiente de teste
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
 }
 
-const dbUser = process.env.DB_USER;
-const password = process.env.DB_PASSWORD;
-
-// faz a conexao com o mongodb
-mongoose
-  .connect(
-    `mongodb+srv://${dbUser}:${password}@clusterapi.aeczj.mongodb.net/?retryWrites=true&w=majority&appName=ClusterAPI`
-  )
-  .then(() => {
-    app.listen(3000);
-    console.log("Conectou ao banco e o servidor porta 3000");
-  })
-  .catch((err) => console.log(err));
+module.exports = {
+  app,
+  startServer,
+  closeServer
+};
