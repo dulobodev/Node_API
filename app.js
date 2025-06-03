@@ -37,8 +37,6 @@ const startServer = async (portToUse = port) => {
       await mongoose.connect(
         `mongodb+srv://${dbUser}:${dbPassword}@clusterapi.aeczj.mongodb.net/?retryWrites=true&w=majority&appName=ClusterAPI`,
         {
-          useNewUrlParser: true,
-          useUnifiedTopology: true,
           serverSelectionTimeoutMS: 30000
         }
       );
