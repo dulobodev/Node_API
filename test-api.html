@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Teste API</title>
+  </head>
+  <body>
+    <h1>Teste de conexão com a API</h1>
+    <button onclick="testarAPI()">Testar Conexão</button>
+    <div id="resultado"></div>
+    <script>
+      async function testarAPI() {
+        const resultado = document.getElementById("resultado");
+        resultado.innerHTML = "Testado 0-0 5-5";
+
+        try {
+          const response = await fetch("https://node-api-qmfr.onrender.com", {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "/"
+            },
+          });
+
+          const data = await response.json();
+          console.log("Resposta da API", data);
+
+          resultado.innerHTML = `<h3>Resultado</h3>
+             <p>${JSON.stringify(data)}</p>`;
+        } catch (error) {
+          console.error("Erro", error);
+          resultado.innerHTML = `Erro: ${error.message}`;
+        }
+      }
+    </script>
+  </body>
+</html>

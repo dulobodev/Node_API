@@ -2,12 +2,32 @@
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
+const cors = require("cors");
+
 const authRoutes = require("./routes/auth_routes");
 const userRoutes = require("./routes/user_routes");
 const errorHandler = require("./middlewares/error_middleware");
 
 const app = express();
 let server = null; // Referência para o servidor
+
+//Configuração do CORS
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "Origin",
+      "X-Requested-With",
+    ],
+    exposedHeaders: ["Content-Range", "X-Requested-With"],
+    maxAge: 86400,
+  })
+);
 
 // Middlewares
 app.use(express.json());
@@ -30,14 +50,14 @@ const port = process.env.PORT || 4000;
 
 const startServer = async (portToUse = port) => {
   try {
-    if (process.env.NODE_ENV !== 'test') {
+    if (process.env.NODE_ENV !== "test") {
       const dbUser = process.env.DB_USER;
       const dbPassword = process.env.DB_PASS;
-      
+
       await mongoose.connect(
         `mongodb+srv://${dbUser}:${dbPassword}@clusterapi.aeczj.mongodb.net/?retryWrites=true&w=majority&appName=ClusterAPI`,
         {
-          serverSelectionTimeoutMS: 30000
+          serverSelectionTimeoutMS: 30000,
         }
       );
       console.log("Conectado ao MongoDB Atlas com sucesso!");
@@ -66,12 +86,12 @@ const closeServer = () => {
 };
 
 // Inicia o servidor apenas fora do ambiente de teste
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== "test") {
   startServer();
 }
 
 module.exports = {
   app,
   startServer,
-  closeServer
+  closeServer,
 };
